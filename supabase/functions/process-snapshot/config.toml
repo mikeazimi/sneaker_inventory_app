@@ -1,0 +1,5 @@
+# process-snapshot function configuration
+# This function is called internally by check-snapshot, so we disable JWT verification
+[jwt]
+verify_jwt = false
+
