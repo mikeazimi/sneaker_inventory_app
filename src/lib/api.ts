@@ -1,4 +1,4 @@
-import { supabase, EDGE_FUNCTIONS } from "./supabase";
+import { supabase, EDGE_FUNCTIONS, isSupabaseConfigured } from "./supabase";
 
 // =============================================================================
 // TYPES
@@ -19,6 +19,9 @@ export interface StoredCredentials {
   is_expired?: boolean;
   auth_type?: "oauth" | "developer";
 }
+
+// Re-export for use in components
+export { isSupabaseConfigured } from "./supabase";
 
 export interface Warehouse {
   id: string;
@@ -58,6 +61,13 @@ export async function authenticateWithCredentials(
   username: string,
   password: string
 ): Promise<AuthResult> {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      message: "Supabase is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.",
+      error: "config_error",
+    };
+  }
   try {
     const response = await fetch(EDGE_FUNCTIONS.auth, {
       method: "POST",
@@ -98,6 +108,13 @@ export async function authenticateWithCredentials(
 export async function authenticateWithToken(
   developerToken: string
 ): Promise<AuthResult> {
+  if (!isSupabaseConfigured()) {
+    return {
+      success: false,
+      message: "Supabase is not configured. Please set environment variables in Vercel.",
+      error: "config_error",
+    };
+  }
   try {
     const response = await fetch(EDGE_FUNCTIONS.auth, {
       method: "POST",
@@ -212,6 +229,9 @@ export async function refreshTokenDirect(refreshTokenValue: string): Promise<Aut
  * Get stored credentials from Supabase
  */
 export async function getStoredCredentials(): Promise<StoredCredentials> {
+  if (!isSupabaseConfigured()) {
+    return { has_credentials: false };
+  }
   try {
     const response = await fetch(EDGE_FUNCTIONS.auth, {
       method: "POST",
@@ -250,6 +270,10 @@ export async function getStoredCredentials(): Promise<StoredCredentials> {
  * Fetch all warehouses from database
  */
 export async function getWarehouses(): Promise<Warehouse[]> {
+  if (!isSupabaseConfigured()) {
+    console.warn("Supabase not configured - returning empty warehouses");
+    return [];
+  }
   console.log("getWarehouses: Fetching from database...")
   const { data, error } = await supabase
     .from("warehouse_registry")
@@ -536,6 +560,9 @@ export async function getSyncJobStatus(jobId: string): Promise<SyncJob | null> {
  * Get recent sync jobs
  */
 export async function getRecentSyncJobs(limit = 10): Promise<SyncJob[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
   const { data, error } = await supabase
     .from("sync_jobs")
     .select("*")
@@ -674,6 +701,9 @@ export interface SyncSettings {
  * Get sync settings
  */
 export async function getSyncSettings(): Promise<SyncSettings | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
   const { data, error } = await supabase
     .from("sync_settings")
     .select("*")

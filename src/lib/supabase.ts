@@ -6,7 +6,8 @@ let _supabase: SupabaseClient | null = null;
 function getSupabaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
+    console.error("NEXT_PUBLIC_SUPABASE_URL is not set - please configure environment variables");
+    return ""; // Return empty to prevent crash, functions will fail gracefully
   }
   return url;
 }
@@ -14,9 +15,15 @@ function getSupabaseUrl(): string {
 function getSupabaseAnonKey(): string {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set");
+    console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY is not set - please configure environment variables");
+    return ""; // Return empty to prevent crash, functions will fail gracefully
   }
   return key;
+}
+
+// Check if Supabase is properly configured
+export function isSupabaseConfigured(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
 // Get or create Supabase client (lazy initialization)
