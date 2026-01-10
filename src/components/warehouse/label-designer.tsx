@@ -78,7 +78,7 @@ interface LabelDesignerProps {
 }
 
 export function LabelDesigner({ isOpen, onClose, item, onPrint }: LabelDesignerProps) {
-  const [selectedSize, setSelectedSize] = useState(LABEL_SIZES[3]) // 4x2 default
+  const [selectedSize, setSelectedSize] = useState<typeof LABEL_SIZES[number]>(LABEL_SIZES[3]) // 4x2 default
   const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({
     sku: true,
     barcode: true,
