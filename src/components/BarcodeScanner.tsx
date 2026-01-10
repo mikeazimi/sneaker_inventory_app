@@ -225,7 +225,6 @@ export default function BarcodeScanner({
                 allowMultiple={false}
                 scanDelay={500}
                 components={{
-                  audio: false,
                   torch: true,
                   finder: false,
                 }}
