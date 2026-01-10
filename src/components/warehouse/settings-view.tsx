@@ -17,7 +17,7 @@ import {
   authenticateWithCredentials, authenticateWithToken, triggerInventorySnapshot, 
   getSyncSettings, updateSyncSettings, getRecentSyncJobs, syncWarehouses, 
   checkSnapshotStatus, cancelPendingSyncJobs, getWarehouses, syncProducts,
-  refreshTokenDirect,
+  refreshTokenDirect, getStoredCredentials,
   type SyncJob, type Warehouse as ApiWarehouse 
 } from "@/lib/api"
 
@@ -243,9 +243,10 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
     { value: "2.25x1.25", label: '2.25" × 1.25"', description: "Dymo compatible" },
   ]
 
-  // Load sync settings and warehouses on mount
+  // Load sync settings, warehouses, and check for stored credentials on mount
   useEffect(() => {
     async function loadSettings() {
+      // Load sync settings
       const settings = await getSyncSettings()
       if (settings) {
         setSyncIntervalHours(settings.sync_interval_hours)
@@ -268,9 +269,58 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
       if (savedShowBorder !== null) {
         setShowLabelBorder(savedShowBorder === "true")
       }
+
+      // Check for stored credentials in Supabase
+      try {
+        const stored = await getStoredCredentials()
+        if (stored.has_credentials && stored.access_token) {
+          console.log("Found stored credentials, expires_at:", stored.expires_at)
+          
+          // Set the token display
+          setDeveloperToken(stored.access_token.substring(0, 20) + "...")
+          
+          if (stored.refresh_token) {
+            setRefreshTokenInput(stored.refresh_token)
+          }
+          
+          if (stored.expires_at) {
+            const expiresDate = new Date(stored.expires_at)
+            setTokenExpiresAt(expiresDate)
+            
+            // If not expired, auto-connect
+            if (!stored.is_expired) {
+              setConnectionStatus("success")
+              onConnectionChange(true, "Connected with saved credentials")
+            } else if (stored.refresh_token) {
+              // Token expired but we have refresh token - try to refresh
+              setConnectionStatus("connecting")
+              const refreshResult = await refreshTokenDirect(stored.refresh_token)
+              if (refreshResult.success) {
+                setConnectionStatus("success")
+                onConnectionChange(true, "Token refreshed automatically")
+                if (refreshResult.expires_at) {
+                  setTokenExpiresAt(new Date(refreshResult.expires_at))
+                }
+              } else {
+              setConnectionStatus("idle")
+              setStatusMessage("Saved token expired - please reconnect")
+            }
+          } else {
+            setConnectionStatus("idle")
+            setStatusMessage("Saved token expired - please reconnect")
+            }
+          } else {
+            // No expiry info but has token - try to use it
+            setConnectionStatus("success")
+            onConnectionChange(true, "Connected with saved credentials")
+          }
+        }
+      } catch (error) {
+        console.error("Error loading stored credentials:", error)
+      }
     }
     loadSettings()
-  }, [])
+  }, [onConnectionChange])
 
   // Auto-polling for pending/processing jobs
   const performStatusCheck = useCallback(async () => {

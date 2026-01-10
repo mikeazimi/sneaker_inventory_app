@@ -26,7 +26,11 @@ interface RefreshWithTokenRequest {
   refresh_token_direct: string; // Refresh token provided directly
 }
 
-type AuthRequest = LoginRequest | RefreshRequest | DeveloperTokenRequest | RefreshWithTokenRequest;
+interface GetCredentialsRequest {
+  get_credentials: true; // Request to retrieve stored credentials
+}
+
+type AuthRequest = LoginRequest | RefreshRequest | DeveloperTokenRequest | RefreshWithTokenRequest | GetCredentialsRequest;
 
 interface ShipHeroTokenResponse {
   access_token: string;
@@ -171,6 +175,13 @@ function isDeveloperTokenRequest(body: AuthRequest): body is DeveloperTokenReque
  */
 function isRefreshWithTokenRequest(body: AuthRequest): body is RefreshWithTokenRequest {
   return "refresh_token_direct" in body && typeof body.refresh_token_direct === "string";
+}
+
+/**
+ * Check if the request is a get credentials request
+ */
+function isGetCredentialsRequest(body: AuthRequest): body is GetCredentialsRequest {
+  return "get_credentials" in body && body.get_credentials === true;
 }
 
 /**
@@ -427,6 +438,59 @@ Deno.serve(async (req: Request) => {
     let expiresAt: string;
     let authType: "oauth" | "developer" = "oauth";
     let accountInfo: AccountQueryData | null = null;
+
+    // =========================================================================
+    // Handle GET CREDENTIALS flow (retrieve stored credentials)
+    // =========================================================================
+    if (isGetCredentialsRequest(body)) {
+      console.log("Processing get credentials request...");
+      
+      // Get stored credentials from database
+      const { data: credentials, error: fetchError } = await supabase
+        .from("api_credentials")
+        .select("access_token, refresh_token, expires_at, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError || !credentials) {
+        console.log("No stored credentials found");
+        return new Response(
+          JSON.stringify({
+            success: false,
+            has_credentials: false,
+            message: "No stored credentials found",
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Check if credentials are expired
+      const expiresAt = new Date(credentials.expires_at);
+      const isExpired = expiresAt < new Date();
+      const hasRefreshToken = credentials.refresh_token && credentials.refresh_token.length > 0;
+
+      console.log("Found stored credentials, expires_at:", credentials.expires_at, "isExpired:", isExpired);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          has_credentials: true,
+          access_token: credentials.access_token,
+          refresh_token: hasRefreshToken ? credentials.refresh_token : null,
+          expires_at: credentials.expires_at,
+          is_expired: isExpired,
+          auth_type: hasRefreshToken ? "oauth" : "developer",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // =========================================================================
     // Handle DEVELOPER TOKEN flow

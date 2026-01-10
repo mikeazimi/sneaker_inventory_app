@@ -11,6 +11,15 @@ export interface AuthResult {
   error?: string;
 }
 
+export interface StoredCredentials {
+  has_credentials: boolean;
+  access_token?: string;
+  refresh_token?: string | null;
+  expires_at?: string;
+  is_expired?: boolean;
+  auth_type?: "oauth" | "developer";
+}
+
 export interface Warehouse {
   id: string;
   shiphero_id_plain: number;
@@ -196,6 +205,40 @@ export async function refreshTokenDirect(refreshTokenValue: string): Promise<Aut
       message: error instanceof Error ? error.message : "Network error",
       error: "network_error",
     };
+  }
+}
+
+/**
+ * Get stored credentials from Supabase
+ */
+export async function getStoredCredentials(): Promise<StoredCredentials> {
+  try {
+    const response = await fetch(EDGE_FUNCTIONS.auth, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ get_credentials: true }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return { has_credentials: false };
+    }
+
+    return {
+      has_credentials: data.has_credentials,
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      is_expired: data.is_expired,
+      auth_type: data.auth_type,
+    };
+  } catch (error) {
+    console.error("Failed to get stored credentials:", error);
+    return { has_credentials: false };
   }
 }
 
