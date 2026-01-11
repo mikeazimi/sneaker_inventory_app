@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { 
   Printer, Wifi, Volume2, Moon, Info, Key, User, Lock, Loader2, 
   CheckCircle2, XCircle, RefreshCw, Clock, Upload, Settings, 
-  Database, Smartphone, ChevronRight, AlertCircle, Timer
+  Database, Smartphone, ChevronRight, AlertCircle, Timer, Trash2
 } from "lucide-react"
 import { CSVUpload } from "./csv-upload"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +17,7 @@ import {
   authenticateWithCredentials, authenticateWithToken, triggerInventorySnapshot, 
   getSyncSettings, updateSyncSettings, getRecentSyncJobs, syncWarehouses, 
   checkSnapshotStatus, cancelPendingSyncJobs, getWarehouses, syncProducts,
-  refreshTokenDirect, getStoredCredentials,
+  refreshTokenDirect, getStoredCredentials, deleteSyncJob, deleteSyncJobsByStatus,
   type SyncJob, type Warehouse as ApiWarehouse 
 } from "@/lib/api"
 
@@ -598,6 +598,38 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
     }
   }
 
+  const handleDeleteJob = async (jobId: string) => {
+    try {
+      const result = await deleteSyncJob(jobId)
+      if (result.success) {
+        // Remove from local state immediately for better UX
+        setRecentJobs(prev => prev.filter(j => j.id !== jobId))
+        setSyncMessage("Job deleted")
+      } else {
+        setSyncMessage(result.message || "Failed to delete")
+      }
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Delete failed")
+    }
+  }
+
+  const handleClearFailedAndPending = async () => {
+    setSyncMessage("Clearing jobs...")
+    try {
+      const result = await deleteSyncJobsByStatus(["failed", "pending", "cancelled"])
+      if (result.success) {
+        setSyncMessage(`Cleared ${result.deleted} job(s)`)
+        setSnapshotStatus(null)
+        const jobs = await getRecentSyncJobs(10)
+        setRecentJobs(jobs)
+      } else {
+        setSyncMessage(result.message || "Failed to clear jobs")
+      }
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Clear failed")
+    }
+  }
+
   const handleSaveSyncSettings = async () => {
     setSavingSettings(true)
     try {
@@ -1011,15 +1043,29 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
                                 )}
                                 <span className="text-sm font-medium text-foreground">{whName}</span>
                               </div>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                job.status === "completed" ? "bg-green-500/20 text-green-500" :
-                                job.status === "failed" ? "bg-red-500/20 text-red-500" :
-                                job.status === "cancelled" ? "bg-gray-500/20 text-gray-500" :
-                                isPending ? "bg-yellow-500/20 text-yellow-500" :
-                                "bg-muted text-muted-foreground"
-                              }`}>
-                                {job.status}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  job.status === "completed" ? "bg-green-500/20 text-green-500" :
+                                  job.status === "failed" ? "bg-red-500/20 text-red-500" :
+                                  job.status === "cancelled" ? "bg-gray-500/20 text-gray-500" :
+                                  isPending ? "bg-yellow-500/20 text-yellow-500" :
+                                  "bg-muted text-muted-foreground"
+                                }`}>
+                                  {job.status}
+                                </span>
+                                {(job.status === "failed" || job.status === "pending" || job.status === "cancelled") && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDeleteJob(job.id)
+                                    }}
+                                    className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                                    title="Delete this job"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-red-400 hover:text-red-500" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             
                             {/* Progress bar for pending/processing jobs */}
@@ -1064,20 +1110,33 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
                   </div>
                 )}
                 
-                {/* Manual refresh button */}
+                {/* Action buttons */}
                 {recentJobs.length > 0 && (
-                  <Button
-                    onClick={async () => {
-                      const jobs = await getRecentSyncJobs(10)
-                      setRecentJobs(jobs)
-                    }}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-3 text-xs text-muted-foreground"
-                  >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    Refresh List
-                  </Button>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      onClick={async () => {
+                        const jobs = await getRecentSyncJobs(10)
+                        setRecentJobs(jobs)
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 text-xs text-muted-foreground"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Refresh
+                    </Button>
+                    {recentJobs.some(j => j.status === "failed" || j.status === "pending" || j.status === "cancelled") && (
+                      <Button
+                        onClick={handleClearFailedAndPending}
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 text-xs text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Clear Failed/Pending
+                      </Button>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

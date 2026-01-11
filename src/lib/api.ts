@@ -578,6 +578,53 @@ export async function getRecentSyncJobs(limit = 10): Promise<SyncJob[]> {
 }
 
 /**
+ * Delete a single sync job by ID
+ */
+export async function deleteSyncJob(jobId: string): Promise<{ success: boolean; message: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, message: "Database not configured" };
+  }
+  
+  const { error } = await supabase
+    .from("sync_jobs")
+    .delete()
+    .eq("id", jobId);
+
+  if (error) {
+    console.error("Error deleting sync job:", error);
+    return { success: false, message: error.message };
+  }
+
+  return { success: true, message: "Job deleted" };
+}
+
+/**
+ * Delete multiple sync jobs by status (e.g., pending, failed)
+ */
+export async function deleteSyncJobsByStatus(statuses: string[]): Promise<{ success: boolean; message: string; deleted: number }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, message: "Database not configured", deleted: 0 };
+  }
+  
+  const { data, error } = await supabase
+    .from("sync_jobs")
+    .delete()
+    .in("status", statuses)
+    .select("id");
+
+  if (error) {
+    console.error("Error deleting sync jobs:", error);
+    return { success: false, message: error.message, deleted: 0 };
+  }
+
+  return { 
+    success: true, 
+    message: `Deleted ${data?.length || 0} jobs`, 
+    deleted: data?.length || 0 
+  };
+}
+
+/**
  * Check snapshot status
  */
 export async function checkSnapshotStatus(snapshotId?: string): Promise<{
