@@ -315,8 +315,52 @@ Deno.serve(async (req: Request) => {
               failedCount++;
             }
           } else {
-            // Job was already processing - just note it's complete on ShipHero side
+            // Job was already processing - check how long it's been processing
+            // If it's been too long, try triggering process-snapshot again
             console.log(`Job ${job.snapshot_id} already in processing state`);
+            
+            // Re-trigger processing if job has been stuck in processing for > 5 minutes
+            const jobData = await supabase
+              .from("sync_jobs")
+              .select("started_at")
+              .eq("id", job.id)
+              .single();
+            
+            if (jobData.data?.started_at) {
+              const startedAt = new Date(jobData.data.started_at);
+              const minutesInProcessing = (Date.now() - startedAt.getTime()) / (1000 * 60);
+              
+              if (minutesInProcessing > 5) {
+                console.log(`Job ${job.snapshot_id} has been processing for ${minutesInProcessing.toFixed(1)} minutes - retrying...`);
+                
+                // Re-trigger process-snapshot
+                const processUrl = `${supabaseUrl}/functions/v1/process-snapshot`;
+                try {
+                  const processResponse = await fetch(processUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${supabaseServiceKey}`,
+                      "apikey": supabaseServiceKey,
+                    },
+                    body: JSON.stringify({
+                      snapshot_id: job.snapshot_id,
+                      snapshot_url: snapshot.snapshot_url,
+                      job_id: job.id,
+                    }),
+                  });
+                  
+                  const processResponseText = await processResponse.text();
+                  console.log(`Retry process-snapshot response (${processResponse.status}): ${processResponseText.substring(0, 500)}`);
+                  
+                  if (processResponse.ok) {
+                    processingTriggered = true;
+                  }
+                } catch (err) {
+                  console.error(`Retry process-snapshot failed for ${job.snapshot_id}:`, err);
+                }
+              }
+            }
           }
 
         } else if (statusLower.includes("error") || statusLower.includes("failed") || statusLower.includes("aborted")) {
