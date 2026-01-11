@@ -29,7 +29,7 @@ export interface Warehouse {
 
 interface SettingsViewProps {
   isConnected: boolean
-  onConnectionChange: (connected: boolean, message?: string) => void
+  onConnectionChange: (connected: boolean, message?: string, switchToInventory?: boolean) => void
   onWarehouseSync?: () => Promise<void>
 }
 
@@ -458,7 +458,8 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
       if (result.success) {
         setConnectionStatus("success")
         setStatusMessage(result.message)
-        onConnectionChange(true, result.message)
+        // User explicitly clicked connect - switch to inventory tab after
+        onConnectionChange(true, result.message, true)
         
         // Save token to localStorage for persistence
         if (authType === "developer" && developerToken.trim()) {

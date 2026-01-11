@@ -157,18 +157,21 @@ export default function WarehouseDashboard() {
     }
   }, [])
 
-  const handleConnectionChange = useCallback(async (connected: boolean, message?: string) => {
+  const handleConnectionChange = useCallback(async (connected: boolean, message?: string, switchToInventory = false) => {
     setIsConnected(connected)
     if (message) {
       setConnectionMessage(message)
     }
     
-    // If connected, refresh warehouses and switch to inventory tab
+    // If connected, refresh warehouses
     if (connected) {
       await refreshWarehouses()
-      setTimeout(() => {
-        setActiveTab("inventory")
-      }, 1500)
+      // Only switch to inventory tab if explicitly requested (user clicked connect)
+      if (switchToInventory) {
+        setTimeout(() => {
+          setActiveTab("inventory")
+        }, 1500)
+      }
     }
   }, [refreshWarehouses])
 
