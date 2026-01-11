@@ -246,28 +246,34 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
   // Load sync settings, warehouses, and check for stored credentials on mount
   useEffect(() => {
     async function loadSettings() {
-      // Load sync settings
-      const settings = await getSyncSettings()
-      if (settings) {
-        setSyncIntervalHours(settings.sync_interval_hours)
-        setAutoSyncEnabled(settings.auto_sync_enabled)
-        setLastSyncAt(settings.last_sync_at)
+      try {
+        // Load sync settings
+        const settings = await getSyncSettings()
+        if (settings) {
+          setSyncIntervalHours(settings.sync_interval_hours)
+          setAutoSyncEnabled(settings.auto_sync_enabled)
+          setLastSyncAt(settings.last_sync_at)
+        }
+        const jobs = await getRecentSyncJobs(10)
+        setRecentJobs(jobs)
+        
+        // Load available warehouses for sync selection
+        const warehouses = await getWarehouses()
+        setAvailableWarehouses(warehouses)
+      } catch (error) {
+        console.error("Error loading settings/warehouses:", error)
       }
-      const jobs = await getRecentSyncJobs(10)
-      setRecentJobs(jobs)
       
-      // Load available warehouses for sync selection
-      const warehouses = await getWarehouses()
-      setAvailableWarehouses(warehouses)
-      
-      // Load label settings from localStorage
-      const savedLabelSize = localStorage.getItem("default_label_size")
-      if (savedLabelSize) {
-        setDefaultLabelSize(savedLabelSize)
-      }
-      const savedShowBorder = localStorage.getItem("show_label_border")
-      if (savedShowBorder !== null) {
-        setShowLabelBorder(savedShowBorder === "true")
+      // Load label settings from localStorage (safe - client side only)
+      if (typeof window !== "undefined") {
+        const savedLabelSize = localStorage.getItem("default_label_size")
+        if (savedLabelSize) {
+          setDefaultLabelSize(savedLabelSize)
+        }
+        const savedShowBorder = localStorage.getItem("show_label_border")
+        if (savedShowBorder !== null) {
+          setShowLabelBorder(savedShowBorder === "true")
+        }
       }
 
       // Check for stored credentials in Supabase
@@ -302,12 +308,12 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
                   setTokenExpiresAt(new Date(refreshResult.expires_at))
                 }
               } else {
+                setConnectionStatus("idle")
+                setStatusMessage("Saved token expired - please reconnect")
+              }
+            } else {
               setConnectionStatus("idle")
               setStatusMessage("Saved token expired - please reconnect")
-            }
-          } else {
-            setConnectionStatus("idle")
-            setStatusMessage("Saved token expired - please reconnect")
             }
           } else {
             // No expiry info but has token - try to use it
@@ -320,7 +326,8 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
       }
     }
     loadSettings()
-  }, [onConnectionChange])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-polling for pending/processing jobs
   const performStatusCheck = useCallback(async () => {
