@@ -32,36 +32,40 @@ export default function WarehouseDashboard() {
   // Load warehouses and check connection status on mount
   useEffect(() => {
     async function loadData() {
-      // Fetch warehouses from database
-      console.log("Loading warehouses...")
-      const warehouseData = await getWarehouses()
-      console.log("Warehouse data from API:", warehouseData)
-      
-      const mappedWarehouses: ExtendedWarehouse[] = warehouseData.map((w: ApiWarehouse) => ({
-        id: w.id,
-        name: w.name,
-        address: `Warehouse ID: ${w.shiphero_id_plain}`,
-        shipheroId: w.shiphero_id_plain,
-      }))
-      console.log("Mapped warehouses:", mappedWarehouses)
-      setWarehouses(mappedWarehouses)
+      try {
+        // Fetch warehouses from database
+        console.log("Loading warehouses...")
+        const warehouseData = await getWarehouses()
+        console.log("Warehouse data from API:", warehouseData)
+        
+        const mappedWarehouses: ExtendedWarehouse[] = warehouseData.map((w: ApiWarehouse) => ({
+          id: w.id,
+          name: w.name,
+          address: `Warehouse ID: ${w.shiphero_id_plain}`,
+          shipheroId: w.shiphero_id_plain,
+        }))
+        console.log("Mapped warehouses:", mappedWarehouses)
+        setWarehouses(mappedWarehouses)
 
-      // Check if we have valid credentials (i.e., already connected)
-      const { data: credentials, error: credError } = await supabase
-        .from("api_credentials")
-        .select("access_token, expires_at")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        // Check if we have valid credentials (i.e., already connected)
+        const { data: credentials, error: credError } = await supabase
+          .from("api_credentials")
+          .select("access_token, expires_at")
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-      console.log("Credentials check:", { credentials, credError })
+        console.log("Credentials check:", { credentials, credError })
 
-      if (credentials?.access_token && credentials.access_token !== "placeholder_access_token") {
-        // Check if token is not expired
-        const expiresAt = new Date(credentials.expires_at)
-        if (expiresAt > new Date()) {
-          setIsConnected(true)
+        if (credentials?.access_token && credentials.access_token !== "placeholder_access_token") {
+          // Check if token is not expired
+          const expiresAt = new Date(credentials.expires_at)
+          if (expiresAt > new Date()) {
+            setIsConnected(true)
+          }
         }
+      } catch (error) {
+        console.error("Error loading initial data:", error)
       }
     }
     loadData()
