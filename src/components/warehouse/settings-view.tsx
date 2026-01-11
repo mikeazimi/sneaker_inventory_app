@@ -1041,7 +1041,12 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
                                 ) : (
                                   <AlertCircle className="w-4 h-4 text-gray-500" />
                                 )}
-                                <span className="text-sm font-medium text-foreground">{whName}</span>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-foreground">{whName}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    ID: {job.snapshot_id?.substring(0, 12)}...
+                                  </span>
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1099,10 +1104,31 @@ export function SettingsView({ isConnected, onConnectionChange, onWarehouseSync 
                                     </span>
                                   )
                                 })()
+                              ) : job.status === "completed" && job.total_items ? (
+                                <span className="text-green-500">
+                                  ✓ {job.total_items.toLocaleString()} records
+                                </span>
+                              ) : job.status === "failed" && job.error_message ? (
+                                <span className="text-red-400 truncate max-w-[150px]" title={job.error_message}>
+                                  {job.error_message.substring(0, 30)}...
+                                </span>
                               ) : (
                                 <span>{new Date(job.created_at).toLocaleDateString()}</span>
                               )}
                             </div>
+                            
+                            {/* Click to copy snapshot ID */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(job.snapshot_id)
+                                setSyncMessage(`Copied: ${job.snapshot_id}`)
+                              }}
+                              className="mt-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title="Click to copy full Snapshot ID"
+                            >
+                              📋 Copy Snapshot ID
+                            </button>
                           </div>
                         </div>
                       );
